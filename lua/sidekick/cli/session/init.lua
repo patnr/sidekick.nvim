@@ -19,6 +19,7 @@ M._attached = {} ---@type table<string,sidekick.cli.Session>
 ---@field parent? sidekick.cli.Session
 ---@field mux_session? string
 ---@field mux_backend? string
+---@field name? string
 
 ---@alias sidekick.cli.session.Opts sidekick.cli.session.State|{cwd?:string,id?:string}
 
@@ -89,6 +90,12 @@ function M.new(state)
   -- self.cmd = state.cmd or { cmd = tool.cmd, env = tool.env }
   self.backend = backend
   self.sid = M.sid({ tool = tool.name, cwd = self.cwd })
+  -- NOTE: `iid` only exists at creation time. A session rediscovered later
+  -- via a backend's own `sessions()` (e.g. tmux.lua returns a pid-derived
+  -- `id` with no `iid` at all) is a different Lua object with a different
+  -- `id`. The durable identity that survives rediscovery is the tmux
+  -- session *name* (`mux_session`), not this field -- see tmux.lua's
+  -- `M:init()` prefix check.
   self.iid = state.iid
   self.id = self.id or (self.iid and (self.sid .. "-" .. self.iid) or self.sid)
   if meta ~= super and self.init then

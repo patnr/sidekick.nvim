@@ -218,6 +218,109 @@ describe("cli.new", function()
   end)
 end)
 
+describe("State.attach reuses an already-attached session from the placeholder", function()
+  local State = require("sidekick.cli.state")
+
+  it("does not construct a second bare session when one is already attached", function()
+    local claude_tool = require("sidekick.config").get_tool("claude")
+    local cwd = Session.cwd()
+    local existing = setmetatable({
+      id = "claude abc-existing",
+      sid = "claude abc",
+      cwd = cwd,
+      tool = claude_tool,
+      started = true,
+      backend = "terminal",
+      priority = 100,
+      is_attached = function()
+        return true
+      end,
+    }, { __index = function() end })
+
+    local original_attached = Session.attached
+    Session.attached = function()
+      return { [existing.id] = existing }
+    end
+    local new_call_count = 0
+    local original_new = Session.new
+    Session.new = function(opts)
+      new_call_count = new_call_count + 1
+      return original_new(opts)
+    end
+    local original_session_attach = Session.attach
+    Session.attach = function(session)
+      return session
+    end
+
+    local state1 = { tool = claude_tool, session = nil, attached = false }
+    local resolved1 = State.attach(state1)
+    local state2 = { tool = claude_tool, session = nil, attached = false }
+    local resolved2 = State.attach(state2)
+
+    Session.attached = original_attached
+    Session.new = original_new
+    Session.attach = original_session_attach
+
+    assert.equals(0, new_call_count) -- reused the existing session both times, never constructed a bare one
+    assert.equals(existing.id, resolved1.session.id)
+    assert.equals(existing.id, resolved2.session.id)
+  end)
+end)
+
+describe("State.with auto-attaches a single started session for a named filter", function()
+  local State = require("sidekick.cli.state")
+  local Select = require("sidekick.cli.ui.select")
+
+  it("does not open the picker when exactly one started session matches", function()
+    local claude_tool = require("sidekick.config").get_tool("claude")
+    local started_session = {
+      tool = claude_tool,
+      started = true,
+      session = { id = "claude abc", cwd = Session.cwd() },
+    }
+
+    local original_get = State.get
+    State.get = function(filter)
+      if filter and filter.attached then
+        return {}
+      end
+      if filter and filter.started then
+        return { started_session }
+      end
+      return {}
+    end
+    local prompted = false
+    local original_select = Select.select
+    Select.select = function()
+      prompted = true
+    end
+    -- stub at the State.attach boundary: the fake started_session's inner
+    -- `session` table has none of the real Session methods, and exercising
+    -- them isn't the point of this test -- only the picker-vs-direct-use
+    -- routing decision in State.with is.
+    local original_attach = State.attach
+    State.attach = function(state)
+      return state, true
+    end
+    local used
+    State.with(function(state)
+      used = state
+    end, { filter = { name = "claude" }, attach = true })
+    -- State.with's callback runs through vim.schedule_wrap; pump the loop
+    -- until it lands (or the wait times out) before inspecting results.
+    vim.wait(100, function()
+      return used ~= nil
+    end)
+
+    State.get = original_get
+    Select.select = original_select
+    State.attach = original_attach
+
+    assert.is_false(prompted)
+    assert.equals(started_session, used)
+  end)
+end)
+
 describe("State.filter_visible", function()
   local State = require("sidekick.cli.state")
 

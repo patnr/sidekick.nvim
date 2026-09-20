@@ -13,6 +13,7 @@ local M = {}
 ---@field session? sidekick.cli.Session
 ---@field started? boolean
 ---@field terminal? sidekick.cli.Terminal
+---@field name? string
 
 ---@class sidekick.cli.Filter
 ---@field attached? boolean
@@ -166,11 +167,16 @@ function M.with(cb, opts)
   local attached = M.get(filter_attached)
 
   if #attached == 0 and opts.attach then
-    require("sidekick.cli.ui.select").select({
-      auto = true,
-      filter = opts.filter,
-      cb = use,
-    })
+    local started = M.get(Util.merge(opts.filter, { started = true }))
+    if #started == 1 then
+      use(started[1])
+    else
+      require("sidekick.cli.ui.select").select({
+        auto = true,
+        filter = opts.filter,
+        cb = use,
+      })
+    end
     return
   end
 
@@ -200,7 +206,17 @@ function M.attach(state, opts)
   local tool = state.tool
 
   -- if the session is already attached, the below is a no-op
-  local session = state.session or Session.new({ tool = tool.name })
+  local session = state.session
+  if not session then
+    local cwd = Session.cwd()
+    for _, s in pairs(Session.attached()) do
+      if s.tool.name == tool.name and s.cwd == cwd then
+        session = s
+        break
+      end
+    end
+    session = session or Session.new({ tool = tool.name })
+  end
   session = Session.attach(session)
 
   state = M.get_state(session) -- update state

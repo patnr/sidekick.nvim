@@ -1,3 +1,4 @@
+local Config = require("sidekick.config")
 local Context = require("sidekick.cli.context")
 local State = require("sidekick.cli.state")
 local Util = require("sidekick.util")
@@ -100,8 +101,16 @@ function M.new(opts)
     Util.error("Starting a new session requires tmux to be installed and available")
     return
   end
+  if Config.cli.mux.create and Config.cli.mux.create ~= "terminal" then
+    Util.error(
+      'Starting a new session requires cli.mux.create to be "terminal" (nvim-embedded), not "'
+        .. Config.cli.mux.create
+        .. '"'
+    )
+    return
+  end
 
-  local session = Session.new({ tool = tool_name, backend = "tmux", iid = tostring(vim.uv.hrtime()) })
+  local session = Session.new({ tool = tool_name, backend = "tmux", iid = ("%x"):format(vim.uv.hrtime()) })
   session = Session.attach(session)
   local state = State.get_state(session)
   if state.terminal then
