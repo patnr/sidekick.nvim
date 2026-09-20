@@ -188,7 +188,7 @@ function M.attach(session)
     session = M.new({
       tool = session.tool:clone({ cmd = cmd.cmd, env = cmd.env }),
       cwd = session.cwd,
-      id = "terminal: " .. session.sid,
+      id = "terminal: " .. session.id,
       backend = "terminal",
       mux_backend = session.backend,
       mux_session = session.mux_session,

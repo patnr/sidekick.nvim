@@ -71,20 +71,27 @@ function M.get(filter)
   local all = {} ---@type sidekick.cli.State[]
   local sessions = filter.attached and Session.attached() or Session.sessions()
 
+  -- Pass 1: decide which sessions are suppressed by a higher-priority
+  -- overlapping session, and let the survivor inherit the suppressed
+  -- session's name (only the raw, lower-priority entry ever carries one).
+  local skip = {} ---@type table<sidekick.cli.Session, boolean>
   for _, s in pairs(sessions) do
-    -- if not attached, skip if another session with higher priority
-    -- is running with overlapping pids
-    local skip = false
     if not s:is_attached() then
       for _, s2 in pairs(sessions) do
         if s2 ~= s and Util.overlaps(s2.pids or {}, s.pids or {}) and s2.priority > s.priority then
-          skip = true
+          skip[s] = true
+          if (not s2.name or s2.name == "") and s.name and s.name ~= "" then
+            s2.name = s.name
+          end
           break
         end
       end
     end
+  end
 
-    if not skip then
+  -- Pass 2: build the state list from what survived.
+  for _, s in pairs(sessions) do
+    if not skip[s] then
       all[#all + 1] = M.get_state(s)
     end
   end

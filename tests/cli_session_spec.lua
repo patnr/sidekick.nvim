@@ -257,3 +257,89 @@ describe("State.filter_visible", function()
     assert.are.same({ visible }, result)
   end)
 end)
+
+describe("terminal wrapper id uses the session's own unique id", function()
+  it("gives two different-iid sessions of the same tool+cwd distinct wrapper ids", function()
+    Session.setup()
+    if not Session.backends.tmux then
+      return -- tmux not installed on this machine; covered by the manual checklist instead
+    end
+
+    local Terminal = require("sidekick.cli.terminal")
+    local original_terminal_start = Terminal.start
+    Terminal.start = function(self)
+      self.started = true -- stub: no real job spawn
+    end
+
+    local s1 = Session.new({ tool = "claude", backend = "tmux", cwd = "/tmp/sidekick-wrap-test", iid = "one" })
+    local s2 = Session.new({ tool = "claude", backend = "tmux", cwd = "/tmp/sidekick-wrap-test", iid = "two" })
+    s1.started = true
+    s2.started = true
+    s1.attach = function()
+      return { cmd = { "true" } }
+    end
+    s2.attach = function()
+      return { cmd = { "true" } }
+    end
+
+    local w1 = Session.attach(s1)
+    local w2 = Session.attach(s2)
+
+    Terminal.start = original_terminal_start
+    Session.detach(w1)
+    Session.detach(w2)
+
+    assert.is_not.equals(w1.id, w2.id)
+    assert.equals("terminal: " .. s1.id, w1.id)
+    assert.equals("terminal: " .. s2.id, w2.id)
+  end)
+end)
+
+describe("State.get propagates name across dedup", function()
+  local State = require("sidekick.cli.state")
+
+  it("gives the surviving higher-priority session the suppressed session's name", function()
+    local original_sessions = Session.sessions
+    local named = setmetatable({
+      id = "raw-1",
+      sid = "claude abc",
+      cwd = "/tmp/project",
+      tool = require("sidekick.config").get_tool("claude"),
+      started = true,
+      backend = "tmux",
+      priority = 50,
+      pids = { 111 },
+      name = "Fix login bug",
+      is_attached = function()
+        return false
+      end,
+    }, { __index = function() end })
+    local wrapper = setmetatable({
+      id = "terminal: claude abc",
+      sid = "claude abc",
+      cwd = "/tmp/project",
+      tool = named.tool,
+      started = true,
+      backend = "terminal",
+      priority = 100,
+      pids = { 111 },
+      is_attached = function()
+        return true
+      end,
+    }, { __index = function() end })
+
+    Session.sessions = function()
+      return { named, wrapper }
+    end
+
+    local states = State.get()
+
+    Session.sessions = original_sessions
+
+    local surviving = vim.tbl_filter(function(s)
+      return s.session == wrapper
+    end, states)
+    assert.equals(1, #surviving)
+    assert.equals("Fix login bug", surviving[1].name)
+  end)
+end)
