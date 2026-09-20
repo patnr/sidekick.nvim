@@ -53,7 +53,7 @@ function M.get_state(session)
     installed = true, -- it's running, so it must be installed
   }, {
     __index = function(_, k)
-      if k == "tool" or k == "started" or k == "external" then
+      if k == "tool" or k == "started" or k == "external" or k == "name" then
         return session[k]
       elseif k == "attached" then
         return session:is_attached()

@@ -66,3 +66,39 @@ describe("tmux mux_session naming and external detection", function()
     assert.is_true(s.external)
   end)
 end)
+
+describe("tmux pane title parsing", function()
+  local tmux_backend = Session.backends.tmux
+
+  it("captures pane_title as part of the discovered pane fields", function()
+    if not tmux_backend then
+      return
+    end
+    -- Simulate one line of `tmux list-panes` output using the new PANE_FORMAT.
+    local line = "$1:%2:12345:my-session:/tmp/project:Fix login bug"
+    local session_id, id, pid, session_name, cwd, title =
+      line:match("^(%$%d+):(%%%d+):(%d+):(.-):(.-):(.*)$")
+    assert.equals("$1", session_id)
+    assert.equals("%2", id)
+    assert.equals("12345", pid)
+    assert.equals("my-session", session_name)
+    assert.equals("/tmp/project", cwd)
+    assert.equals("Fix login bug", title)
+  end)
+end)
+
+describe("State.get_state name passthrough", function()
+  local State = require("sidekick.cli.state")
+
+  it("exposes session.name on the returned state", function()
+    local session = { name = "Fix login bug", tool = { name = "claude" }, started = true, backend = "tmux" }
+    local state = State.get_state(session)
+    assert.equals("Fix login bug", state.name)
+  end)
+
+  it("is nil when the session has no name yet", function()
+    local session = { tool = { name = "claude" }, started = true, backend = "tmux" }
+    local state = State.get_state(session)
+    assert.is_nil(state.name)
+  end)
+end)

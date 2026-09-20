@@ -114,6 +114,10 @@ function M.format(state, picker)
     else
       ret[#ret + 1] = { vim.fn.fnamemodify(state.session.cwd, ":p:~"), "Directory" }
     end
+    if state.name and state.name ~= "" then
+      ret[#ret + 1] = { "  " }
+      ret[#ret + 1] = { state.name, "SidekickCliName" }
+    end
   end
   return ret
 end
