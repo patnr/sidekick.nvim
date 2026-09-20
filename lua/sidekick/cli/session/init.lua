@@ -140,11 +140,15 @@ function M.sessions()
     for _, s in pairs(backend:sessions()) do
       s.backend = name
       s.started = true
-      ret[#ret + 1] = M.new(s)
-      assert(not ids[s.id], "duplicate session id: " .. s.id)
-      ids[s.id] = true
-      if M._attached[s.id] then
-        M._attached[s.id] = ret[#ret] -- update to latest session instance
+      local session = M.new(s)
+      if ids[session.id] then
+        Util.warn("Duplicate session id, skipping: " .. session.id)
+      else
+        ret[#ret + 1] = session
+        ids[session.id] = true
+        if M._attached[session.id] then
+          M._attached[session.id] = session -- update to latest session instance
+        end
       end
     end
   end

@@ -69,7 +69,6 @@ end
 function M.get(filter)
   filter = filter or {}
   local all = {} ---@type sidekick.cli.State[]
-  local sids = {} ---@type table<string, boolean>
   local sessions = filter.attached and Session.attached() or Session.sessions()
 
   for _, s in pairs(sessions) do
@@ -86,23 +85,16 @@ function M.get(filter)
     end
 
     if not skip then
-      local ss = M.get_state(s)
-      all[#all + 1] = ss
-      if not ss.external then
-        sids[s.sid] = true
-      end
+      all[#all + 1] = M.get_state(s)
     end
   end
 
   if not filter.attached then
     for name, tool in pairs(Config.tools()) do
-      local sid = Session.sid({ tool = name })
-      if not sids[sid] then
-        all[#all + 1] = {
-          tool = tool,
-          installed = vim.fn.executable(tool.cmd[1]) == 1,
-        }
-      end
+      all[#all + 1] = {
+        tool = tool,
+        installed = vim.fn.executable(tool.cmd[1]) == 1,
+      }
     end
   end
 

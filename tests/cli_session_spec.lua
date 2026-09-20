@@ -87,6 +87,68 @@ describe("tmux pane title parsing", function()
   end)
 end)
 
+describe("Session.sessions dedup", function()
+  it("skips a duplicate discovered id instead of crashing", function()
+    local original_backends = Session.backends
+    Session.backends = {
+      fake = {
+        sessions = function()
+          return {
+            { id = "dup", cwd = "/tmp/a", tool = "claude" },
+            { id = "dup", cwd = "/tmp/a", tool = "claude" },
+          }
+        end,
+      },
+    }
+    -- fake backend needs to behave enough like a real one for Session.new's setmetatable
+    setmetatable(Session.backends.fake, { __index = function() end })
+
+    local ok, result = pcall(Session.sessions)
+
+    Session.backends = original_backends
+
+    assert.is_true(ok)
+    assert.equals(1, #result)
+  end)
+end)
+
+describe("State.get always offers a start-new placeholder", function()
+  local State = require("sidekick.cli.state")
+  local Config = require("sidekick.config")
+
+  it("includes an idle row for a tool even when instances are already running", function()
+    local original_sessions = Session.sessions
+    Session.sessions = function()
+      local claude_tool = Config.get_tool("claude")
+      return {
+        setmetatable({
+          id = "claude abc-1",
+          -- must match what state.lua's tool loop computes for the current
+          -- cwd via Session.sid({ tool = name }), or the old dedup-by-sid
+          -- bug this test targets never actually triggers
+          sid = Session.sid({ tool = "claude" }),
+          cwd = "/tmp/project",
+          tool = claude_tool,
+          started = true,
+          backend = "terminal",
+          is_attached = function()
+            return false
+          end,
+        }, { __index = function() end }),
+      }
+    end
+
+    local states = State.get()
+
+    Session.sessions = original_sessions
+
+    local idle_rows = vim.tbl_filter(function(s)
+      return s.tool.name == "claude" and s.session == nil
+    end, states)
+    assert.equals(1, #idle_rows)
+  end)
+end)
+
 describe("State.get_state name passthrough", function()
   local State = require("sidekick.cli.state")
 
