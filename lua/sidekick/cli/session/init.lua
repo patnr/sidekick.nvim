@@ -9,6 +9,7 @@ M._attached = {} ---@type table<string,sidekick.cli.Session>
 
 ---@class sidekick.cli.session.State
 ---@field id string unique id of the running tool (typically pid of tool)
+---@field iid? string
 ---@field cwd string
 ---@field tool sidekick.cli.Tool|string
 ---@field pids? integer[] list of pids associated with this session
@@ -88,7 +89,8 @@ function M.new(state)
   -- self.cmd = state.cmd or { cmd = tool.cmd, env = tool.env }
   self.backend = backend
   self.sid = M.sid({ tool = tool.name, cwd = self.cwd })
-  self.id = self.id or self.sid
+  self.iid = state.iid
+  self.id = self.id or (self.iid and (self.sid .. "-" .. self.iid) or self.sid)
   if meta ~= super and self.init then
     self:init()
   end

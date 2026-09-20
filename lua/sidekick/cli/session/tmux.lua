@@ -12,17 +12,17 @@ local PANE_FORMAT =
 
 ---@return sidekick.cli.terminal.Cmd?
 function M:attach()
-  if self.sid == self.mux_session then
-    return { cmd = { "tmux", "attach-session", "-t", self.sid } }
+  if not self.external then
+    return { cmd = { "tmux", "attach-session", "-t", self.mux_session } }
   end
 end
 
 function M:init()
   if self.started then
-    self.external = self.sid ~= self.mux_session
+    self.external = not (self.mux_session and self.mux_session:sub(1, #self.sid) == self.sid)
   else
     self.external = vim.env.TMUX and Config.cli.mux.create ~= "terminal"
-    self.mux_session = self.sid
+    self.mux_session = self.id
   end
   self.priority = self.external and 10 or 50
 end
