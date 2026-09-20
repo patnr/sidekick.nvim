@@ -164,3 +164,56 @@ describe("State.get_state name passthrough", function()
     assert.is_nil(state.name)
   end)
 end)
+
+describe("cli.new", function()
+  local CLI = require("sidekick.cli")
+  local Util = require("sidekick.util")
+
+  it("errors clearly when the tmux backend isn't available", function()
+    Session.setup()
+    local original_tmux = Session.backends.tmux
+    Session.backends.tmux = nil
+
+    local errored = false
+    local original_error = Util.error
+    Util.error = function()
+      errored = true
+    end
+
+    CLI.new({ tool = "claude" })
+
+    Util.error = original_error
+    Session.backends.tmux = original_tmux
+
+    assert.is_true(errored)
+  end)
+
+  it("generates a distinct iid on every call", function()
+    Session.setup()
+    if not Session.backends.tmux then
+      return -- tmux not installed on this machine; covered by the manual checklist instead
+    end
+
+    local seen = {}
+    local original_new = Session.new
+    Session.new = function(opts)
+      seen[#seen + 1] = opts.iid
+      return original_new(opts)
+    end
+    local original_attach = Session.attach
+    Session.attach = function(session)
+      return session -- avoid actually spawning/attaching tmux in this test
+    end
+
+    CLI.new({ tool = "claude" })
+    CLI.new({ tool = "claude" })
+
+    Session.new = original_new
+    Session.attach = original_attach
+
+    assert.equals(2, #seen)
+    assert.is_not_nil(seen[1])
+    assert.is_not_nil(seen[2])
+    assert.is_not.equals(seen[1], seen[2])
+  end)
+end)

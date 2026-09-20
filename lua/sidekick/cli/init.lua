@@ -1,6 +1,7 @@
 local Context = require("sidekick.cli.context")
 local State = require("sidekick.cli.state")
 local Util = require("sidekick.util")
+local Session = require("sidekick.cli.session")
 
 local M = {}
 
@@ -80,6 +81,33 @@ function M.select(opts)
       end
     end
   require("sidekick.cli.ui.select").select(opts)
+end
+
+--- Start a brand-new session for a tool, leaving any existing sessions
+--- of that tool in this cwd untouched. Requires the tmux backend.
+---@param opts? {tool: string}
+---@overload fun(tool: string)
+function M.new(opts)
+  opts = type(opts) == "string" and { tool = opts } or opts or {}
+  local tool_name = opts.tool
+  if not tool_name then
+    Util.error("sidekick.cli.new() requires a tool name")
+    return
+  end
+
+  Session.setup()
+  if not Session.backends.tmux then
+    Util.error("Starting a new session requires tmux to be installed and available")
+    return
+  end
+
+  local session = Session.new({ tool = tool_name, backend = "tmux", iid = tostring(vim.uv.hrtime()) })
+  session = Session.attach(session)
+  local state = State.get_state(session)
+  if state.terminal then
+    state.terminal:show()
+    state.terminal:focus()
+  end
 end
 
 ---@param opts? sidekick.cli.Show
