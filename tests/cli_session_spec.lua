@@ -342,4 +342,55 @@ describe("State.get propagates name across dedup", function()
     assert.equals(1, #surviving)
     assert.equals("Fix login bug", surviving[1].name)
   end)
+
+  it("keeps the propagated name in sync with the raw entry's live title across repeated calls", function()
+    local original_sessions = Session.sessions
+    local named = setmetatable({
+      id = "raw-1",
+      sid = "claude abc",
+      cwd = "/tmp/project",
+      tool = require("sidekick.config").get_tool("claude"),
+      started = true,
+      backend = "tmux",
+      priority = 50,
+      pids = { 111 },
+      name = "Fix login bug",
+      is_attached = function()
+        return false
+      end,
+    }, { __index = function() end })
+    local wrapper = setmetatable({
+      id = "terminal: claude abc",
+      sid = "claude abc",
+      cwd = "/tmp/project",
+      tool = named.tool,
+      started = true,
+      backend = "terminal",
+      priority = 100,
+      pids = { 111 },
+      is_attached = function()
+        return true
+      end,
+    }, { __index = function() end })
+
+    Session.sessions = function()
+      return { named, wrapper }
+    end
+
+    local function surviving_name()
+      local states = State.get()
+      local surviving = vim.tbl_filter(function(s)
+        return s.session == wrapper
+      end, states)
+      assert.equals(1, #surviving)
+      return surviving[1].name
+    end
+
+    assert.equals("Fix login bug", surviving_name())
+
+    named.name = "Refactor auth module"
+    assert.equals("Refactor auth module", surviving_name())
+
+    Session.sessions = original_sessions
+  end)
 end)

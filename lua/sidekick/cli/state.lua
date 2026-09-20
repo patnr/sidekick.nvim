@@ -80,7 +80,7 @@ function M.get(filter)
       for _, s2 in pairs(sessions) do
         if s2 ~= s and Util.overlaps(s2.pids or {}, s.pids or {}) and s2.priority > s.priority then
           skip[s] = true
-          if (not s2.name or s2.name == "") and s.name and s.name ~= "" then
+          if s.name and s.name ~= "" then
             s2.name = s.name
           end
           break
