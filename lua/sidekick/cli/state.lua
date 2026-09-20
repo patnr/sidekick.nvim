@@ -129,6 +129,16 @@ function M.get(filter)
   return ret
 end
 
+--- Narrows a list of attached states down to the ones currently visible
+--- in an open terminal window.
+---@param states sidekick.cli.State[]
+---@return sidekick.cli.State[]
+function M.filter_visible(states)
+  return vim.tbl_filter(function(s)
+    return s.terminal ~= nil and s.terminal:is_open()
+  end, states)
+end
+
 --- Executes a callback with one or more attached sessions.
 ---@param cb fun(state: sidekick.cli.State, attached?: boolean):any?
 ---@param opts? sidekick.cli.With
@@ -154,15 +164,24 @@ function M.with(cb, opts)
       filter = opts.filter,
       cb = use,
     })
-  elseif #attached > 1 and not opts.all then
-    require("sidekick.cli.ui.select").select({
-      auto = true,
-      filter = filter_attached,
-      cb = use,
-    })
-  else
-    vim.tbl_map(use, attached)
+    return
   end
+
+  if #attached > 1 and not opts.all then
+    local visible = M.filter_visible(attached)
+    if #visible == 1 then
+      attached = visible
+    else
+      require("sidekick.cli.ui.select").select({
+        auto = true,
+        filter = filter_attached,
+        cb = use,
+      })
+      return
+    end
+  end
+
+  vim.tbl_map(use, attached)
 end
 
 ---@param state sidekick.cli.State

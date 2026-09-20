@@ -217,3 +217,43 @@ describe("cli.new", function()
     assert.is_not.equals(seen[1], seen[2])
   end)
 end)
+
+describe("State.filter_visible", function()
+  local State = require("sidekick.cli.state")
+
+  local function fake(is_open)
+    if is_open == nil then
+      return { terminal = nil }
+    end
+    return {
+      terminal = {
+        is_open = function()
+          return is_open
+        end,
+      },
+    }
+  end
+
+  it("returns an empty list when nothing is visible", function()
+    local result = State.filter_visible({ fake(false), fake(false) })
+    assert.are.same({}, result)
+  end)
+
+  it("returns the single visible entry", function()
+    local b = fake(true)
+    local result = State.filter_visible({ fake(false), b })
+    assert.are.same({ b }, result)
+  end)
+
+  it("returns every entry that is visible when more than one is open", function()
+    local a, b = fake(true), fake(true)
+    local result = State.filter_visible({ a, b })
+    assert.are.same({ a, b }, result)
+  end)
+
+  it("ignores sessions with no terminal at all (e.g. external)", function()
+    local visible = fake(true)
+    local result = State.filter_visible({ fake(nil), visible })
+    assert.are.same({ visible }, result)
+  end)
+end)
