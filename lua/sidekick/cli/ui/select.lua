@@ -114,8 +114,13 @@ function M.format(state, picker)
     else
       ret[#ret + 1] = { vim.fn.fnamemodify(state.session.cwd, ":p:~"), "Directory" }
     end
-    if state.name and state.name ~= "" then
+    local agent = state.session.status and Config.ui.icons["agent_" .. state.session.status]
+    if agent then
       ret[#ret + 1] = { "  " }
+      ret[#ret + 1] = { agent, "SidekickAgent" .. state.session.status:gsub("^%l", string.upper) }
+    end
+    if state.name and state.name ~= "" then
+      ret[#ret + 1] = { agent and "" or "  " }
       ret[#ret + 1] = { state.name, "SidekickCliName" }
     end
   end

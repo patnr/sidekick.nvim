@@ -8,7 +8,7 @@ local M = {}
 M.__index = M
 
 local PANE_FORMAT =
-  "#{session_id}:#{pane_id}:#{pane_pid}:#{session_name}:#{?pane_current_path,#{pane_current_path},#{pane_start_path}}:#{pane_title}"
+  "#{session_id}:#{pane_id}:#{pane_pid}:#{@sidekick_status}:#{session_name}:#{?pane_current_path,#{pane_current_path},#{pane_start_path}}:#{pane_title}"
 
 ---@return sidekick.cli.terminal.Cmd?
 function M:attach()
@@ -90,7 +90,8 @@ function M.panes(opts)
   local lines = Util.exec(cmd, { notify = opts.notify == true })
   local panes = {} ---@type sidekick.tmux.Pane[]
   for _, line in ipairs(lines or {}) do
-    local session_id, id, pid, session_name, cwd, title = line:match("^(%$%d+):(%%%d+):(%d+):(.-):(.-):(.*)$")
+    local session_id, id, pid, status, session_name, cwd, title =
+      line:match("^(%$%d+):(%%%d+):(%d+):(%a*):(.-):(.-):(.*)$")
     if id and pid and session_name and cwd then
       pid = assert(tonumber(pid), "invalid tmux pane_pid: " .. pid) --[[@as number]]
       ---@class sidekick.tmux.Pane
@@ -102,10 +103,23 @@ function M.panes(opts)
         session_id = session_id,
         cwd = cwd,
         title = title or "",
+        status = status, -- `@sidekick_status` pane option, set by the tool's hooks ("" if unset)
       }
     end
   end
   return panes
+end
+
+--- Tool status (`@sidekick_status`: busy/idle/waiting, or "" if unset) of each tmux pane, keyed like `Session.key()`:
+--- by tmux session name for sessions we started, by pane-derived id for external ones.
+---@return table<string,string>
+function M.statuses()
+  local ret = {} ---@type table<string,string>
+  for _, pane in ipairs(M.panes()) do
+    ret["tmux:" .. pane.session_name] = pane.status
+    ret[pane.skid] = pane.status
+  end
+  return ret
 end
 
 function M.clients()
@@ -146,6 +160,7 @@ function M.sessions()
             mux_session = pane.session_name,
             pids = pids,
             name = pane.title,
+            status = pane.status ~= "" and pane.status or nil,
           }
           return true
         end

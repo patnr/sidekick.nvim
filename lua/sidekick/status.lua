@@ -15,6 +15,8 @@ local M = {}
 local status = {} ---@type table<integer, sidekick.lsp.Status>
 local cli_sessions = {} ---@type table<string, sidekick.cli.Status>
 local cli_last_update = 0
+local agents = {} ---@type table<string,string>
+local agents_last_update = 0
 
 local levels = {
   Normal = vim.log.levels.INFO,
@@ -108,6 +110,27 @@ function M.cli()
     cli_last_update = now
   end
   return vim.tbl_values(cli_sessions)
+end
+
+--- Status (busy/idle/waiting) of tmux sessions owned by this nvim instance, as reported by
+--- the tools' own hooks via the `@sidekick_status` pane option ("" if unset).
+---@return table<string,string> status by `Session.key()`
+function M.agents()
+  local Session = require("sidekick.cli.session")
+  if next(Session._owned) == nil then
+    return {}
+  end
+  local now = vim.uv.now()
+  if now - agents_last_update > 2000 then
+    agents_last_update = now
+    agents = {}
+    for key, status in pairs(require("sidekick.cli.session.tmux").statuses()) do
+      if Session._owned[key] then
+        agents[key] = status
+      end
+    end
+  end
+  return agents
 end
 
 return M

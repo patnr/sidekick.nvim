@@ -21,6 +21,7 @@ M._owned = {} ---@type table<string,boolean> keys of sessions attached in this n
 ---@field mux_session? string
 ---@field mux_backend? string
 ---@field name? string
+---@field status? "busy"|"idle"|"waiting" set by the tool's hooks (tmux `@sidekick_status` pane option)
 
 ---@alias sidekick.cli.session.Opts sidekick.cli.session.State|{cwd?:string,id?:string}
 
