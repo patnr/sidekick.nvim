@@ -6,6 +6,7 @@ local M = {}
 M.backends = {} ---@type table<string,sidekick.cli.Session>
 M.did_setup = false
 M._attached = {} ---@type table<string,sidekick.cli.Session>
+M._owned = {} ---@type table<string,boolean> keys of sessions attached in this nvim instance
 
 ---@class sidekick.cli.session.State
 ---@field id string unique id of the running tool (typically pid of tool)
@@ -116,6 +117,24 @@ function M.sid(opts)
   return ("%s %s"):format(tool, vim.fn.sha256(cwd):sub(1, 16 - #tool))
 end
 
+--- Identity of the underlying tool process, which survives detaching and
+--- rediscovery (unlike `id`, which differs between the tmux session we start,
+--- the terminal wrapping it, and the pane-derived id tmux.lua rediscovers).
+---@param session sidekick.cli.Session
+function M.key(session)
+  if session.mux_session and not session.external then
+    return (session.mux_backend or session.backend) .. ":" .. session.mux_session
+  end
+  return session.id
+end
+
+--- Whether the session has been attached in this nvim instance (and so is
+--- fair game for implicit attaches, e.g. by `toggle()`).
+---@param session sidekick.cli.Session
+function M.is_owned(session)
+  return M._owned[M.key(session)] == true
+end
+
 ---@param name string
 ---@param backend sidekick.cli.Session
 function M.register(name, backend)
@@ -191,6 +210,7 @@ function M.attach(session)
   else
     cmd = session:start()
   end
+  M._owned[M.key(session)] = true -- after start(), which may assign the id (external tmux)
   if cmd then
     session = M.new({
       tool = session.tool:clone({ cmd = cmd.cmd, env = cmd.env }),

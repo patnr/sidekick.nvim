@@ -21,6 +21,7 @@ local M = {}
 ---@field external? boolean
 ---@field installed? boolean
 ---@field name? string
+---@field owned? boolean tools without a session, or sessions attached in this nvim instance
 ---@field session? string
 ---@field started? boolean
 ---@field terminal? boolean
@@ -41,6 +42,7 @@ function M.is(t, filter)
     and (filter.external == nil or filter.external == t.external)
     and (filter.installed == nil or filter.installed == t.installed)
     and (filter.name == nil or filter.name == t.tool.name)
+    and (filter.owned == nil or filter.owned == (not t.session or Session.is_owned(t.session)))
     and (filter.session == nil or (t.session and t.session.id == filter.session))
     and (filter.started == nil or filter.started == t.started)
     and (filter.terminal == nil or filter.terminal == (t.terminal ~= nil))
@@ -167,13 +169,16 @@ function M.with(cb, opts)
   local attached = M.get(filter_attached)
 
   if #attached == 0 and opts.attach then
-    local started = M.get(Util.merge(opts.filter, { started = true }))
+    -- Only (re)attach sessions previously attached in this nvim instance.
+    -- Others (started elsewhere, or before a restart) are left to `select()`.
+    local owned = Util.merge(opts.filter, { owned = true })
+    local started = M.get(Util.merge(owned, { started = true }))
     if #started == 1 then
       use(started[1])
     else
       require("sidekick.cli.ui.select").select({
         auto = true,
-        filter = opts.filter,
+        filter = owned,
         cb = use,
       })
     end
@@ -216,6 +221,16 @@ function M.attach(state, opts)
       end
     end
     session = session or Session.new({ tool = tool.name })
+    -- Picking a bare tool means starting it. Don't let `tmux new -A` silently
+    -- attach to a session (e.g. from another nvim instance) that took the name.
+    if session.backend == "tmux" and not session.started and not session.external then
+      for _, s in ipairs(Session.sessions()) do
+        if not s.external and s.mux_session == session.mux_session then
+          session = Session.new({ tool = tool.name, iid = ("%x"):format(vim.uv.hrtime()) })
+          break
+        end
+      end
+    end
   end
   session = Session.attach(session)
 

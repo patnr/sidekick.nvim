@@ -76,8 +76,7 @@ describe("tmux pane title parsing", function()
     end
     -- Simulate one line of `tmux list-panes` output using the new PANE_FORMAT.
     local line = "$1:%2:12345:my-session:/tmp/project:Fix login bug"
-    local session_id, id, pid, session_name, cwd, title =
-      line:match("^(%$%d+):(%%%d+):(%d+):(.-):(.-):(.*)$")
+    local session_id, id, pid, session_name, cwd, title = line:match("^(%$%d+):(%%%d+):(%d+):(.-):(.-):(.*)$")
     assert.equals("$1", session_id)
     assert.equals("%2", id)
     assert.equals("12345", pid)
