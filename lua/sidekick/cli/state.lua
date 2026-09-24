@@ -170,7 +170,8 @@ function M.with(cb, opts)
 
   if #attached == 0 and opts.attach then
     -- Only (re)attach sessions previously attached in this nvim instance.
-    -- Others (started elsewhere, or before a restart) are left to `select()`.
+    -- If there are none (e.g. after a restart), let the user pick among all,
+    -- rather than silently attaching one started elsewhere.
     local owned = Util.merge(opts.filter, { owned = true })
     local started = M.get(Util.merge(owned, { started = true }))
     if #started == 1 then
@@ -178,7 +179,7 @@ function M.with(cb, opts)
     else
       require("sidekick.cli.ui.select").select({
         auto = true,
-        filter = owned,
+        filter = #started == 0 and opts.filter or owned,
         cb = use,
       })
     end
